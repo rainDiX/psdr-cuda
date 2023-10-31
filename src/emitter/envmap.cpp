@@ -25,6 +25,8 @@ void EnvironmentMap::configure() {
     m_ready = true;
 }
 
+void EnvironmentMap::setposition(Vector3fD p){}
+
 
 SpectrumC EnvironmentMap::eval(const IntersectionC &its, MaskC active) const {
     Vector3fC wi_world = its.sh_frame.to_world(its.wi);

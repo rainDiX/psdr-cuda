@@ -3,7 +3,7 @@
 
 namespace psdr
 {
-
+// pmf probaibility mass function
 void DiscreteDistribution::init(const FloatC &pmf) {
     m_size = static_cast<int>(slices(pmf));
     m_sum = hsum(pmf);

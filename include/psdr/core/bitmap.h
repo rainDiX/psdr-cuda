@@ -3,9 +3,27 @@
 #include <psdr/psdr.h>
 #include <misc/Exception.h>
 
-
+// layer map
 namespace psdr
 {
+
+template <int channels>
+struct Layermap {
+    static_assert(channels == 1 || channels == 3);
+    using ScalarValue = typename std::conditional<channels == 1, float, const ScalarVector3f&>::type;
+
+    template <bool ad>
+    using Value = typename std::conditional<channels == 1, Float<ad>, Vector3f<ad>>::type;
+
+    using ValueC = Value<false>;
+    using ValueD = Value<true>;
+
+    Layermap();
+    Layermap(const char *file_name, int number=1);
+    Layermap(ScalarValue value);
+};
+
+// Xi Deng add a layer map
 
 template <int channels>
 struct Bitmap {
@@ -40,3 +58,4 @@ using Bitmap1fD = Bitmap<1>;
 using Bitmap3fD = Bitmap<3>;
 
 } // namespace psdr
+

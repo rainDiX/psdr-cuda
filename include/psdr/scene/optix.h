@@ -66,10 +66,19 @@ void optix_release( PathTracerState& state )
     CUDA_CHECK( cudaFree( reinterpret_cast<void*>( state.sbt.hitgroupRecordBase ) ) );
     CUDA_CHECK( cudaFree( reinterpret_cast<void*>( state.d_gas_output_buffer ) ) );
     CUDA_CHECK( cudaFree( reinterpret_cast<void*>( state.d_params ) ) );
+    // CUDA_CHECK( cudaFree( reinterpret_cast<void*>( state.d_vertices ) ) );
 }
 
-void optix_config(PathTracerState& state, const std::vector<int> &face_offset) {
+/*xi deng added one parameter */
+typedef struct {
+    int face_offset;
+    float *vertex;
+    int *index;
+    int layer_id; // -1 no layer, 0 outer layer, >0 inner layers
+} FaceInfo;
 
+void optix_config(PathTracerState& state, const std::vector<FaceInfo> &face_info) {
+    // face_offset
     // ------------------------
     //  OptiX context creation
     // ------------------------
@@ -238,11 +247,17 @@ void optix_config(PathTracerState& state, const std::vector<int> &face_offset) {
                 ) );
 
     std::vector<HitGroupRecord> hg_sbts;
-    for( int i = 0; i < static_cast<int>(face_offset.size()); ++i )
+    for( int i = 0; i < static_cast<int>(face_info.size()-1); ++i )
     {
         HitGroupRecord rec = {};
-        rec.data.shape_offset = face_offset[i];
+        rec.data.shape_offset = face_info[i].face_offset;
         rec.data.shape_id = i;
+        /*BEGIN: xi deng added */
+        rec.data.vertex = face_info[i].vertex;
+        rec.data.index = face_info[i].index;
+        rec.data.layer_id = face_info[i].layer_id;
+        /*END: xi deng added */
+        
         OPTIX_CHECK( optixSbtRecordPackHeader( state.radiance_hit_group, &rec ) );
         hg_sbts.push_back( rec );
     }
@@ -318,17 +333,21 @@ void build_accel(PathTracerState& state, const std::vector<OptixBuildInput>& tri
     CUDA_CHECK( cudaMemcpy( &compact_size, reinterpret_cast<void*>(emit_property.result), sizeof(size_t), cudaMemcpyDeviceToHost ) );
 
         if (compact_size < buffer_sizes.outputSizeInBytes) {
-            void* compact_buffer = cuda_malloc(compact_size);
+            if (state.d_gas_output_buffer)
+                CUDA_CHECK( cudaFree( reinterpret_cast<void*>( state.d_gas_output_buffer ) ) );
+            CUDA_CHECK( cudaMalloc( reinterpret_cast<void**>( &state.d_gas_output_buffer ), compact_size ) );
+            // void* compact_buffer = cuda_malloc(compact_size);
             OPTIX_CHECK(optixAccelCompact(
                 state.context,
                 0, // CUDA stream
                 state.gas_handle,
-                (CUdeviceptr)compact_buffer,
+                state.d_gas_output_buffer,
+                // (CUdeviceptr)compact_buffer,
                 compact_size,
                 &state.gas_handle
             ));
             cuda_free(output_buffer);
-            output_buffer = compact_buffer;
+            // output_buffer = compact_buffer;
         }
 
     // build CUDA stream

@@ -15,13 +15,35 @@ SpectrumD RoughConductor::eval(const IntersectionD& its, const Vector3fD& wo, Ma
     return __eval<true>(its, wo, active);
 }
 
+// Begin: Xi Deng added to support bssrdf
+SpectrumC RoughConductor::eval(const IntersectionC& its, const BSDFSampleC& bs, MaskC active) const {
+    // Vector3fC wo = its.sh_frame.to_world(bs.wo);
+    return __eval<false>(its, bs.wo, active);
+}
 
-BSDFSampleC RoughConductor::sample(const IntersectionC& its, const Vector3fC& sample, MaskC active) const {
+
+SpectrumD RoughConductor::eval(const IntersectionD& its, const BSDFSampleD& bs, MaskD active) const {
+    // Vector3fD wo = its.sh_frame.to_world(bs.wo);
+    return __eval<true>(its, bs.wo, active);
+}
+
+FloatC RoughConductor::pdf(const IntersectionC& its, const BSDFSampleC& bs, MaskC active) const {
+    return __pdf<false>(its, bs.wo, active);
+}
+
+
+FloatD RoughConductor::pdf(const IntersectionD& its, const BSDFSampleD& bs, MaskD active) const {
+    return __pdf<true>(its, bs.wo, active);
+}
+
+// End
+
+BSDFSampleC RoughConductor::sample(const Scene *scene, const IntersectionC& its, const Vector8fC& sample, MaskC active) const {
     return __sample<false>(its, sample, active);
 }
 
 
-BSDFSampleD RoughConductor::sample(const IntersectionD& its, const Vector3fD& sample, MaskD active) const {
+BSDFSampleD RoughConductor::sample(const Scene *scene, const IntersectionD& its, const Vector8fD& sample, MaskD active) const {
     return __sample<true>(its, sample, active);
 }
 
@@ -76,18 +98,21 @@ Float<ad> RoughConductor::__pdf(const Intersection<ad>& its, const Vector3f<ad>&
 
 
 template <bool ad>
-BSDFSample<ad> RoughConductor::__sample(const Intersection<ad>& its, const Vector3f<ad>& sample, Mask<ad> active) const {
+BSDFSample<ad> RoughConductor::__sample(const Intersection<ad>& its, const Vector8f<ad>& sample, Mask<ad> active) const {
     BSDFSample<ad> bs;
     Float<ad> cos_theta_i = Frame<ad>::cos_theta(its.wi);
     Float<ad> alpha_u = m_alpha_u.eval<ad>(its.uv);
     Float<ad> alpha_v = m_alpha_v.eval<ad>(its.uv);
     GGXDistribution distr(alpha_u, alpha_v);
 
-    Vector3f<ad> wo = distr.sample<ad>(its.wi, sample);
+    Vector3f<ad> wo = distr.sample<ad>(its.wi, tail<3>(sample));
     bs.wo = fmsub(Vector3f<ad>(wo), 2.f * dot(its.wi, wo), its.wi);
     Vector3f<ad> H = normalize(bs.wo + its.wi);
-    bs.pdf = pdf(its, bs.wo, active);
-    bs.is_valid = (cos_theta_i > 0.f && neq(bs.pdf, 0.f) && Frame<ad>::cos_theta(bs.wo) > 0.f) & active;
+    // bs.pdf = pdf(its, bs.wo, active);
+    bs.po = its;
+    bs.pdf = pdf(its, bs, active);
+    bs.is_valid = (cos_theta_i > 0.f) & active;
+    bs.is_sub = false;
     return bs;
 }
 

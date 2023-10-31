@@ -18,11 +18,13 @@ namespace psdr
 
     template <bool ad>
     using Interaction  = Interaction_<Float<ad>>;
-
     using InteractionC = Interaction<false>;
     using InteractionD = Interaction<true>;
+    
+    
 
     struct Intersection_OptiX;
+    struct LayerIntersection;
 
     // template <bool ad> struct Intersection;
     template <typename> struct Intersection_;
@@ -32,6 +34,14 @@ namespace psdr
 
     using IntersectionC = Intersection<false>;
     using IntersectionD = Intersection<true>;
+    
+    template <bool ad>
+    using IntersectionArray = Array<Intersection<ad>, 20>;
+
+    // using IntersectionArray  = Type<Intersection*, ad>;
+    // using IntersectionArrayC = IntersectionArray<false>;
+    // using IntersectionArrayD = IntersectionArray<true>;
+    // using IntersectionVector = Intersections__<Float<ad>>;
 
     struct Sampler;
 
@@ -69,6 +79,14 @@ namespace psdr
     using BSDFSampleC           = BSDFSample<false>;
     using BSDFSampleD           = BSDFSample<true>;
 
+// Xi Deng added
+    // template <typename> struct BSSDFSample_;
+    // template <bool ad>
+    // using BSSDFSample            = BSSDFSample_<Float<ad>>;
+    // using BSSDFSampleC           = BSSDFSample<false>;
+    // using BSSDFSampleD           = BSSDFSample<true>;
+// Xi Deng added    
+
     template <typename> struct SensorDirectSample_;
     template <bool ad>
     using SensorDirectSample    = SensorDirectSample_<Float<ad>>;
@@ -78,7 +96,6 @@ namespace psdr
     struct BoundarySegSampleDirect;
 
     // Main classes
-
     class BSDF;
     template <bool ad>
     using BSDFArray     = Type<BSDF*, ad>;
@@ -87,6 +104,7 @@ namespace psdr
 
     class Diffuse;
     class RoughConductor;
+    // class Subsurface;
 
     class Emitter;
     template <bool ad>
@@ -109,6 +127,10 @@ namespace psdr
     class Integrator;
     class FieldExtractionIntegrator;
     class DirectIntegrator;
+    class LaserIntegrator;
+    class ColocateIntegrator;
+    class OldDirectIntegrator;
+    class Integrator;
 
     class Scene_OptiX;
     class Scene;

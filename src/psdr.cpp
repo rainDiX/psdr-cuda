@@ -18,6 +18,11 @@
 #include <psdr/bsdf/diffuse.h>
 #include <psdr/bsdf/ggx.h>
 #include <psdr/bsdf/roughconductor.h>
+// #include <psdr/bsdf/subsurface.h>
+#include <psdr/bsdf/hetersub.h>
+// #include <psdr/bsdf/layersub.h>
+#include <psdr/bsdf/microfacet.h>
+
 
 #include <psdr/emitter/area.h>
 #include <psdr/emitter/envmap.h>
@@ -32,6 +37,9 @@
 #include <psdr/integrator/integrator.h>
 #include <psdr/integrator/field.h>
 #include <psdr/integrator/direct.h>
+#include <psdr/integrator/direct_origin.h>
+#include <psdr/integrator/laser.h>
+#include <psdr/integrator/colocate.h>
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -55,24 +63,29 @@ PYBIND11_MODULE(psdr_cuda, m) {
         .def(py::init<int, int, int>(), "width"_a, "height"_a, "spp/sppe"_a)
         .def(py::init<int, int, int, int>(), "width"_a, "height"_a, "spp"_a, "sppe"_a)
         .def(py::init<int, int, int, int, int>(), "width"_a, "height"_a, "spp"_a, "sppe"_a, "sppse"_a)
+        .def(py::init<int, int, int, int, int, int>(), "width"_a, "height"_a, "spp"_a, "sppe"_a, "sppse"_a, "sppsce"_a)
         .def_readwrite("width", &RenderOption::width)
         .def_readwrite("height", &RenderOption::height)
+        .def_readwrite("cropwidth", &RenderOption::cropwidth)
+        .def_readwrite("cropheight", &RenderOption::cropheight)
+        .def_readwrite("crop_offset_x", &RenderOption::cropoffset_x)
+        .def_readwrite("crop_offset_y", &RenderOption::cropoffset_y)
         .def_readwrite("spp", &RenderOption::spp)
         .def_readwrite("sppe", &RenderOption::sppe)
         .def_readwrite("sppse", &RenderOption::sppse)
+        .def_readwrite("sppsce", &RenderOption::sppsce)
         .def_readwrite("log_level", &RenderOption::log_level)
         .def("__repr__",
             [](const RenderOption &ro) {
                 std::stringstream oss;
-                oss << "[width: " << ro.width << ", height: " << ro.height
-                    << ", spp: " << ro.spp << ", sppe: " << ro.sppe << ", sppse: " << ro.sppse
+                oss << "[width: " << ro.cropwidth << ", height: " << ro.cropheight
+                    << ", spp: " << ro.spp << ", sppe: " << ro.sppe << ", sppse: " << ro.sppse <<  ", sppsce: " << ro.sppsce
                     << ", log_level: " << ro.log_level << "]";
                 return oss.str();
             }
         );
 
     // Core classes
-
     py::class_<RayC>(m, "RayC")
         .def(py::init<>())
         .def("reversed", &RayC::reversed)
@@ -198,14 +211,17 @@ PYBIND11_MODULE(psdr_cuda, m) {
     // BSDFs
 
     py::class_<BSDF, Object>(m, "BSDF")
-        .def("anisotropic", &BSDF::anisotropic);
+        .def("anisotropic", &BSDF::anisotropic)
+        .def("hasbssdf", &BSDF::hasbssdf);
+      
 
     py::class_<Diffuse, BSDF>(m, "DiffuseBSDF")
         //.def(py::init<>())
         //.def(py::init<const ScalarVector3f&>())
         //.def(py::init<const char*>())
         //.def(py::init<const Bitmap3fD&>())
-        .def_readwrite("reflectance", &Diffuse::m_reflectance);
+        .def_readwrite("reflectance", &Diffuse::m_reflectance)
+        .def("setDiffuseReflectance", &Diffuse::setDiffuseReflectance, "filename"_a);
 
     py::class_<RoughConductor, BSDF>(m, "RoughConductorBSDF")
         .def_readwrite("alpha_u", &RoughConductor::m_alpha_u)
@@ -213,6 +229,31 @@ PYBIND11_MODULE(psdr_cuda, m) {
         .def_readwrite("eta", &RoughConductor::m_eta)
         .def_readwrite("k", &RoughConductor::m_k)
         .def_readwrite("specular_reflectance", &RoughConductor::m_specular_reflectance);
+        
+
+    py::class_<HeterSub, BSDF>(m, "HetersubBSDF")
+        .def_readwrite("alpha_u", &HeterSub::m_alpha_u)
+        .def_readwrite("alpha_v", &HeterSub::m_alpha_v)
+        .def_readwrite("eta", &HeterSub::m_eta)
+        .def_readwrite("g", &HeterSub::m_g)
+        .def_readwrite("albedo", &HeterSub::m_albedo)
+        .def_readwrite("sigma_t", &HeterSub::m_sigma_t)
+        .def_readwrite("specular_reflectance", &HeterSub::m_specular_reflectance)
+        .def("setAlbedo", &HeterSub::setAlbedo, "albedo"_a)
+        .def("setSigmaT", &HeterSub::setSigmaT, "sigma_t"_a)
+        .def("setAlbedoTexture", &HeterSub::setAlbedoTexture, "filename"_a)
+        .def("setSigmaTexture", &HeterSub::setSigmaTexture, "filename"_a)  
+        .def("setAlphaTexture", &HeterSub::setAlphaTexture, "filename"_a);    
+
+
+    py::class_<Microfacet, BSDF>(m, "MicrofacetBSDF")
+        .def_readwrite("alpha", &Microfacet::m_roughness)
+        .def_readwrite("specular_reflectance", &Microfacet::m_specularReflectance)
+        .def_readwrite("reflectance", &Microfacet::m_diffuseReflectance)
+        .def("setAlphaTexture", &Microfacet::setAlphaTexture, "filename"_a)
+        .def("setDiffuseReflectance", &Microfacet::setDiffuseReflectance, "filename"_a)  
+        .def("setSpecularReflectance", &Microfacet::setSpecularReflectance, "filename"_a);
+  
 
     // Sensors
 
@@ -226,6 +267,7 @@ PYBIND11_MODULE(psdr_cuda, m) {
     // Emitters
 
     py::class_<Emitter, Object>(m, "Emitter");
+        // .def("set_position", &Emitter::setposition);
 
     py::class_<AreaLight, Emitter>(m, "AreaLight")
         .def(py::init<const ScalarVector3f&, const Mesh*>());
@@ -271,6 +313,8 @@ PYBIND11_MODULE(psdr_cuda, m) {
         .def("load_file", &Scene::load_file, "file_name"_a, "auto_configure"_a = true)
         .def("load_string", &Scene::load_string, "scene_xml"_a, "auto_configure"_a = true)
         .def("configure", &Scene::configure)
+        .def("setseed", &Scene::setseed, "seed"_a)
+        .def("setlightposition", &Scene::setlightposition, "p"_a)
         .def("sample_boundary_segment_direct", &Scene::sample_boundary_segment_direct, "sample3"_a, "active"_a = true)
         .def_readwrite("opts", &Scene::m_opts, "Render options")
         .def_readonly("num_sensors", &Scene::m_num_sensors)
@@ -292,4 +336,16 @@ PYBIND11_MODULE(psdr_cuda, m) {
     py::class_<DirectIntegrator, Integrator>(m, "DirectIntegrator")
         .def(py::init<int, int>(), "bsdf_samples"_a = 1, "light_samples"_a = 1)
         .def_readwrite("hide_emitters", &DirectIntegrator::m_hide_emitters);
+
+    py::class_<OldDirectIntegrator, Integrator>(m, "OldDirectIntegrator")
+        .def(py::init<int, int>(), "bsdf_samples"_a = 1, "light_samples"_a = 1)
+        .def_readwrite("hide_emitters", &OldDirectIntegrator::m_hide_emitters);
+
+    py::class_<LaserIntegrator, Integrator>(m, "LaserIntegrator")
+        .def(py::init<int, int>(), "bsdf_samples"_a = 1, "light_samples"_a = 1)
+        .def_readwrite("hide_emitters", &LaserIntegrator::m_hide_emitters);
+
+    py::class_<ColocateIntegrator, Integrator>(m, "ColocateIntegrator")
+        .def(py::init<int, int>(), "bsdf_samples"_a = 1, "light_samples"_a = 1)
+        .def_readwrite("hide_emitters", &ColocateIntegrator::m_hide_emitters);
 }

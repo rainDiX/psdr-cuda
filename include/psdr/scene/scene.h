@@ -3,9 +3,19 @@
 #include <unordered_map>
 #include <psdr/psdr.h>
 #include <psdr/edge/edge.h>
+#include <psdr/emitter/emitter.h>
 
 namespace psdr
 {
+
+typedef struct LayerIntersection {
+    void reserve(int64_t size, int64_t depth=0);
+    int64_t size;
+    int64_t depth;
+    Vector2fD uvs;
+    IntC numIntersections;
+    IntC shape_ids;
+} LayerIntersection;
 
 PSDR_CLASS_DECL_BEGIN(Scene, final, Object)
     friend class SceneLoader;
@@ -22,8 +32,23 @@ public:
     void configure();
     bool is_ready() const;
 
+    void setseed(const int seed) {
+        m_seed = seed;
+        // m_samplers[0].seed(m_seed);
+    }
+
+    void setlightposition(Vector3fD p){
+        m_emitters[0]->setposition(p);
+    }
+
     template <bool ad, bool path_space = false>
     Intersection<ad> ray_intersect(const Ray<ad> &ray, Mask<ad> active = true, TriangleInfoD *out_info = nullptr) const;
+
+    template <bool ad, bool path_space = false>
+    Intersection<ad> ray_all_intersect(const Ray<ad> &ray, Mask<ad> active, const Vector8f<ad> &sample, const int depth, TriangleInfoD *out_info = nullptr) const;
+
+    template <bool ad, bool path_space = false>
+    LayerIntersection ray_all_layer(const Ray<ad> &ray, Mask<ad> active, const int depth) const;
 
     template <bool ad>
     Spectrum<ad> Lenv(const Vector3f<ad> &wi, Mask<ad> active = true) const;
@@ -35,10 +60,11 @@ public:
     Float<ad> emitter_position_pdf(const Vector3f<ad> &ref_p, const Intersection<ad> &its, Mask<ad> active = true) const;
 
     BoundarySegSampleDirect sample_boundary_segment_direct(const Vector3fC &sample3, MaskC active = true) const;
-
+    
     std::string to_string() const override;
 
     int                     m_num_sensors;
+    int                     m_seed = 0;
     std::vector<Sensor*>    m_sensors;
 
     std::vector<Emitter*>   m_emitters;

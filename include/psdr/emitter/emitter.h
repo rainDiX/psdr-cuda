@@ -11,7 +11,7 @@ public:
     virtual ~Emitter() override {}
 
     virtual void configure() = 0;
-
+    virtual void setposition(Vector3fD p) = 0;
     // Returns the emitted radiance at its.p in direction its.wi
 
     virtual SpectrumC eval(const IntersectionC &its, MaskC active = true) const = 0;

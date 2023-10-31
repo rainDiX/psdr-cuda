@@ -46,7 +46,7 @@ The ``image`` variable returned by the integrator's ``renderC()`` function is a 
 .. code-block:: python3
 
    # Cast to a Numpy array and reshape
-   out = image.numpy().reshape((scene.opts.height, scene.opts.width, 3))
+   out = image.numpy().reshape((scene.opts.cropheight, scene.opts.cropwidth, 3))
 
    # Save to OpenEXR image using OpenCV
    import cv2
@@ -73,8 +73,8 @@ This variable is automatically set when loading the scene but can also be overwr
    scene.load_file('scene.xml', auto_configure=False)
 
    # Overwriting the render options
-   scene.opts.width     = 256
-   scene.opts.height    = 256
+   scene.opts.cropwidth     = 256
+   scene.opts.cropheight    = 256
    scene.opts.spp       = 32
 
    # Configure the scene

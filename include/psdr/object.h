@@ -8,7 +8,7 @@ public:
 
     virtual std::string type_name() const = 0;
 
-    void log(const char *msg) const {
+    void LOG(const char *msg) const {
         std::cout << "[" << type_name() << "] " << msg << std::endl;
     }
 

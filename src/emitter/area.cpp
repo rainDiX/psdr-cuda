@@ -7,6 +7,8 @@
 namespace psdr
 {
 
+void AreaLight::setposition(Vector3fD p){}
+
 void AreaLight::configure() {
     PSDR_ASSERT((m_mesh != nullptr) && m_mesh->m_ready);
     PSDR_ASSERT(slices(m_radiance) == 1U);

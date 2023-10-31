@@ -11,6 +11,7 @@ public:
     AreaLight(const ScalarVector3f &radiance, const Mesh *mesh) : m_radiance(radiance), m_mesh(mesh) {}
 
     void configure() override;
+    void setposition(Vector3fD p) override;
 
     SpectrumC eval(const IntersectionC &its, MaskC active = true) const override;
     SpectrumD eval(const IntersectionD &its, MaskD active = true) const override;

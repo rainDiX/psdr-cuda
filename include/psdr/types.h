@@ -62,6 +62,24 @@ using Vector4f  = Vectorf<4, ad>;
 template <bool ad>
 using Vector4i  = Vectori<4, ad>;
 
+template <bool ad>
+using Vector5f  = Vectorf<5, ad>;
+
+template <bool ad>
+using Vector5i  = Vectori<5, ad>;
+
+template <bool ad>
+using Vector7i  = Vectori<7, ad>;
+
+template <bool ad>
+using Vector7f  = Vectorf<7, ad>;
+
+template <bool ad>
+using Vector8i  = Vectori<8, ad>;
+
+template <bool ad>
+using Vector8f  = Vectorf<8, ad>;
+
 using Vector2fC = Vector2f<false>;
 using Vector2fD = Vector2f<true>;
 
@@ -80,6 +98,17 @@ using Vector4fD = Vector4f<true>;
 using Vector4iC = Vector4i<false>;
 using Vector4iD = Vector4i<true>;
 
+using Vector5iC = Vector5i<false>;
+using Vector5iD = Vector5i<true>;
+
+using Vector5fC = Vector5f<false>;
+using Vector5fD = Vector5f<true>;
+
+using Vector7fC = Vector7f<false>;
+using Vector7fD = Vector7f<true>;
+
+using Vector8fC = Vector8f<false>;
+using Vector8fD = Vector8f<true>;
 // Matrix arrays (GPU)
 
 template <bool ad>
@@ -169,16 +198,20 @@ using UInt64C   = Type<uint64_t, false>;
 // Render options
 
 struct RenderOption {
-    RenderOption() : width(128), height(128), spp(1), sppe(1), log_level(1) {}
-    RenderOption(int w, int h, int s) : width(w), height(h), spp(s), sppe(s), sppse(s), log_level(1) {}
-    RenderOption(int w, int h, int s1, int s2) : width(w), height(h), spp(s1), sppe(s2), sppse(s2), log_level(1) {}
-    RenderOption(int w, int h, int s1, int s2, int s3) : width(w), height(h), spp(s1), sppe(s2), sppse(s3), log_level(1) {}
+    RenderOption() : width(128), height(128), spp(1), sppe(1), log_level(1) { cropwidth = width; cropheight = height; cropoffset_x = 0, cropoffset_y = 0;}
+    RenderOption(int w, int h, int s) : width(w), height(h), spp(s), sppe(s), sppse(s), log_level(1) {cropwidth = width; cropheight = height; cropoffset_x = 0, cropoffset_y = 0;}
+    RenderOption(int w, int h, int s1, int s2) : width(w), height(h), spp(s1), sppe(s2), sppse(s2), log_level(1) {cropwidth = width; cropheight = height; cropoffset_x = 0, cropoffset_y = 0;}
+    RenderOption(int w, int h, int s1, int s2, int s3) : width(w), height(h), spp(s1), sppe(s2), sppse(s3), log_level(1) {cropwidth = width; cropheight = height; cropoffset_x = 0, cropoffset_y = 0;}
+    RenderOption(int w, int h, int s1, int s2, int s3, int s4) : width(w), height(h), spp(s1), sppe(s2), sppse(s3), sppsce(s4), log_level(1) {cropwidth = width; cropheight = height; cropoffset_x = 0, cropoffset_y = 0;}
 
     int width, height;  // Image resolution
     int spp;            // Spp for the main image/interior integral
     int sppe;           // Spp for primary edge integral
     int sppse;          // Spp for secondary edge integral
+    int sppsce;          // Spp for secondary edge integral
     int log_level;
+    int cropwidth, cropheight;
+    int cropoffset_x, cropoffset_y;
 };
 
 } // namespace psdr

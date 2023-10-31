@@ -20,12 +20,12 @@ FieldExtractionIntegrator::FieldExtractionIntegrator(const char *field) : m_fiel
 }
 
 
-SpectrumC FieldExtractionIntegrator::Li(const Scene &scene, Sampler &sampler, const RayC &ray, MaskC active) const {
+SpectrumC FieldExtractionIntegrator::Li(const Scene &scene, Sampler &sampler, const RayC &ray, MaskC active, int sensor_id) const {
     return __Li<false>(scene, ray, active);
 }
 
 
-SpectrumD FieldExtractionIntegrator::Li(const Scene &scene, Sampler &sampler, const RayD &ray, MaskD active) const {
+SpectrumD FieldExtractionIntegrator::Li(const Scene &scene, Sampler &sampler, const RayD &ray, MaskD active, int sensor_id) const {
     return __Li<true>(scene, ray, active);
 }
 

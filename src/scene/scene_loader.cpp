@@ -9,7 +9,11 @@
 #include <psdr/core/sampler.h>
 #include <psdr/bsdf/diffuse.h>
 #include <psdr/bsdf/roughconductor.h>
+#include <psdr/bsdf/hetersub.h>
+#include <psdr/bsdf/layersub.h>
+#include <psdr/bsdf/microfacet.h>
 #include <psdr/emitter/area.h>
+#include <psdr/emitter/point.h>
 #include <psdr/emitter/envmap.h>
 #include <psdr/sensor/perspective.h>
 #include <psdr/shape/mesh.h>
@@ -143,13 +147,13 @@ static std::pair<int, int> load_film(const pugi::xml_node &node) {
     return { width, height };
 }
 
-
 static ScalarVector3f load_rgb(const pugi::xml_node &node) {
     if ( strcmp(node.name(), "float") == 0 ) {
         return ScalarVector3f(node.attribute("value").as_float());
     } else if ( strcmp(node.name(), "rgb") == 0 ) {
         return parse_vector<3>(node.attribute("value").value(), true);
     } else {
+        // std::cout<<"node name"<<std::node.name();
         PSDR_ASSERT_MSG(false, std::string("Unsupported RGB type: ") + node.name());
     }
 }
@@ -157,7 +161,8 @@ static ScalarVector3f load_rgb(const pugi::xml_node &node) {
 
 template <int nchannels>
 void load_texture(const pugi::xml_node &node, Bitmap<nchannels> &bitmap) {
-    if ( strcmp(node.name(), "texture") == 0 ) {
+    //std::cout<<"loading..."<<node.name()<<std::endl;
+    if ( strcmp(node.name(), "texture") == 0) {
         bitmap.load_openexr(parse_bitmap(node).c_str());
     } else {
         if constexpr ( nchannels == 1 ) {
@@ -207,30 +212,37 @@ void build_param_map(Scene::ParamMap &param_map, const std::vector<T*> arr, cons
 
 void SceneLoader::load_scene(const pugi::xml_document &doc, Scene &scene) {
     PSDR_ASSERT_MSG(!scene.m_loaded, "Scene already loaded!");
-
+    
     const pugi::xml_node &root = doc.child("scene");
 
     // Load sensors
+    //std::cout<<"Loading sensor"<<::std::endl;
     for ( auto node = root.child("sensor"); node; node = node.next_sibling("sensor") ) {
+        // std::cout<<node.attribute("id").value();
+        
         load_sensor(node, scene);
     }
 
     // Load BSDFs
+    //std::cout<<"Loading material"<<::std::endl;
     for ( auto node = root.child("bsdf"); node; node = node.next_sibling("bsdf") ) {
         load_bsdf(node, scene);
     }
 
+    //std::cout<<"Loading emitter"<<::std::endl;
     // Load (env) emitter
     for ( auto node = root.child("emitter"); node; node = node.next_sibling("emitter") ) {
         load_emitter(node, scene);
     }
 
+    //std::cout<<"Loading shape"<<::std::endl;
     // Load shapes
     for ( auto node = root.child("shape"); node; node = node.next_sibling("shape") ) {
         load_shape(node, scene);
     }
 
     // Build the parameter map
+   // std::cout<<"build param map"<<::std::endl;
     build_param_map<Mesh   >(scene.m_param_map, scene.m_meshes  , "Mesh"   );
     build_param_map<Emitter>(scene.m_param_map, scene.m_emitters, "Emitter");
     build_param_map<Sensor >(scene.m_param_map, scene.m_sensors , "Sensor" );
@@ -239,6 +251,7 @@ void SceneLoader::load_scene(const pugi::xml_document &doc, Scene &scene) {
     scene.m_num_meshes = static_cast<int>(scene.m_meshes.size());
 
     scene.m_loaded = true;
+    //std::cout<<"scene loaded"<<::std::endl;
 }
 
 
@@ -253,7 +266,11 @@ void SceneLoader::load_sensor(const pugi::xml_node &node, Scene &scene) {
 
         RenderOption &opts = scene.m_opts;
         std::tie(opts.width, opts.height) = load_film(film_node);
-        opts.spp = opts.sppe = opts.sppse = load_sampler(sampler_node);
+        opts.cropwidth = opts.width;
+        opts.cropheight = opts.height;
+        opts.cropoffset_x = 0;
+        opts.cropoffset_y = 0;
+        opts.spp = opts.sppe = opts.sppse = opts.sppsce = load_sampler(sampler_node);
     } else {
         PSDR_ASSERT_MSG(!film_node, "Duplicate film node");
         PSDR_ASSERT_MSG(!sampler_node, "Duplicate sampler node");
@@ -309,7 +326,11 @@ void SceneLoader::load_emitter(const pugi::xml_node &node, Scene &scene) {
         emitter->m_to_world_raw = Matrix4fD(to_world);
         scene.m_emitters.push_back(emitter);
         scene.m_emitter_env = emitter;
-    } else {
+
+    }else if(strcmp(emitter_type, "point") == 0 ){
+        PointLight *emitter = new PointLight(load_rgb(find_child_by_name(node, {"power"})), Matrix4fD(load_transform(find_child_by_name(node, {"to_world"}))));
+        scene.m_emitters.push_back(emitter);
+    }else {
         PSDR_ASSERT_MSG(false, std::string("Unsupported emitter: ") + emitter_type);
     }
 }
@@ -342,7 +363,86 @@ void SceneLoader::load_bsdf(const pugi::xml_node &node, Scene &scene) {
         load_texture(eta, b->m_eta);
         load_texture(k, b->m_k);
         bsdf = b;
-    } else {
+    } 
+    // else if( strcmp(bsdf_type, "subsurface") == 0){
+    //     // subsurface material
+    //     pugi::xml_node alpha = find_child_by_name(node, {"alpha"});
+    //     pugi::xml_node eta = find_child_by_name(node, {"eta"});
+    //     pugi::xml_node reflectance = find_child_by_name(node, {"reflectance"});
+    //     pugi::xml_node albedo = find_child_by_name(node, {"albedo"});
+    //     pugi::xml_node sigma_t = find_child_by_name(node, {"sigma_t"});
+    //     pugi::xml_node specular_reflectance = find_child_by_name(node, {"specular_reflectance"});
+    //     pugi::xml_node specular_prob = find_child_by_name(node, {"specular_prob"});
+        
+    //     Subsurface *b = new Subsurface();
+    //     load_texture(alpha, b->m_alpha_u);
+    //     load_texture(alpha, b->m_alpha_v);
+    //     load_texture(eta, b->m_eta);
+    //     load_texture(specular_reflectance, b->m_specular_reflectance);
+    //     load_texture(sigma_t, b->m_sigma_t);
+    //     load_texture(albedo, b->m_albedo);
+    //     load_texture(reflectance, b->m_reflectance);
+    //     load_texture(specular_prob, b->m_specular_prob);
+    //     bsdf = b;
+    // }
+    else if(strcmp(bsdf_type, "hetersub") == 0){
+        pugi::xml_node alpha = find_child_by_name(node, {"alpha"});
+        pugi::xml_node eta = find_child_by_name(node, {"eta"});
+        pugi::xml_node albedo = find_child_by_name(node, {"albedo"});
+        pugi::xml_node sigma_tr = find_child_by_name(node, {"sigma_t"});
+        pugi::xml_node specular_reflectance = find_child_by_name(node, {"specular_reflectance"});
+        
+        HeterSub *b = new HeterSub();
+        load_texture(alpha, b->m_alpha_u);
+        load_texture(alpha, b->m_alpha_v);
+        load_texture(eta, b->m_eta);
+        load_texture(specular_reflectance, b->m_specular_reflectance);
+        load_texture(sigma_tr, b->m_sigma_t);
+        load_texture(albedo, b->m_albedo);
+        bsdf = b;
+    }else if(strcmp(bsdf_type, "microfacet") == 0){
+        pugi::xml_node alpha = find_child_by_name(node, {"alpha"});
+        pugi::xml_node reflectance = find_child_by_name(node, {"reflectance"});
+        pugi::xml_node specular_reflectance = find_child_by_name(node, {"specular_reflectance"});
+
+        Microfacet *b = new Microfacet();
+        load_texture(alpha, b->m_roughness);
+        load_texture(specular_reflectance, b->m_specularReflectance);
+        load_texture(reflectance, b->m_diffuseReflectance);
+        bsdf = b;
+    }
+    // else if(strcmp(bsdf_type, "layersub") == 0){
+    //     pugi::xml_node alpha = find_child_by_name(node, {"alpha"});
+    //     pugi::xml_node eta = find_child_by_name(node, {"eta"});
+    //     pugi::xml_node reflectance = find_child_by_name(node, {"reflectance"});
+    //     pugi::xml_node albedo = find_child_by_name(node, {"albedo"});
+    //     pugi::xml_node sigma_tr = find_child_by_name(node, {"sigma_t"});
+    //     pugi::xml_node specular_reflectance = find_child_by_name(node, {"specular_reflectance"});
+    //     pugi::xml_node specular_prob = find_child_by_name(node, {"specular_prob"});
+    //     pugi::xml_node layers = find_child_by_name(node, {"layer_count"});
+    //     pugi::xml_node maxdepth = find_child_by_name(node, {"max_depth"});
+    //     pugi::xml_node layerdepthnode = find_child_by_name(node, {"layer_depth"});
+
+    //     int layercount = layers.attribute("value").as_int();
+    //     float layermaxdepth = maxdepth.attribute("value").as_float();
+    //     float layerdepth = layerdepthnode.attribute("value").as_float();
+        
+    //     LayerSub *b = new LayerSub();
+    //     load_texture(alpha, b->m_alpha_u);
+    //     load_texture(alpha, b->m_alpha_v);
+    //     load_texture(eta, b->m_eta);
+    //     load_texture(specular_reflectance, b->m_specular_reflectance);
+    //     load_texture(sigma_tr, b->m_sigma_t);
+    //     load_texture(albedo, b->m_albedo);
+    //     load_texture(reflectance, b->m_reflectance);
+    //     load_texture(specular_prob, b->m_specular_prob);
+    //     b->m_layerDepth = layerdepth;
+    //     b->m_layers = layercount;
+    //     b->m_maxDepth = layermaxdepth;
+    //     bsdf = b;
+        
+    // }
+    else{
         PSDR_ASSERT_MSG(false, std::string("Unsupported BSDF: ") + bsdf_type);
     }
 
@@ -379,6 +479,30 @@ void SceneLoader::load_shape(const pugi::xml_node &node, Scene &scene) {
         PSDR_ASSERT_MSG(false, std::string("Unsupported shape: ") + shape_type);
     }
 
+    // duplicate mesh layer
+    const pugi::xml_node &int_node = node.child("int");
+    PSDR_ASSERT(strcmp(int_node.attribute("name").value(), "layer_count") == 0);
+    const pugi::xml_node &float_node = node.child("float");
+    PSDR_ASSERT(strcmp(float_node.attribute("name").value(), "layer_depth") == 0);
+    const int layer_count = std::atoi(int_node.attribute("value").value());
+    const float layer_depth = std::atof(float_node.attribute("value").value());
+    //
+    //std::cout<<" triangle uv indices "<<mesh->m_face_uv_indices<<std::endl;
+    if (layer_count > 0)
+        mesh->m_layer_count = 0;
+
+    // generate layer meshes
+    std::vector<Mesh *> layer_instances;
+    layer_instances.resize(layer_count);
+    for( int i = 0 ; i < layer_count ; i++){
+        layer_instances[i] = new Mesh();
+        layer_instances[i]->instance(mesh, layer_depth * (i + 1));
+        layer_instances[i]->m_layer_count = i + 1;
+        // std::cout<<"uvs "<<layer_instances[i]->m_vertex_uv<<std::endl;
+       // std::cout<<" triangle uv indices "<<layer_instances[i]->m_face_uv_indices<<std::endl;
+    }
+
+
     // Set BSDF
     const pugi::xml_node &ref_node = node.child("ref");
     PSDR_ASSERT_MSG(ref_node, std::string("Missing BSDF reference"));
@@ -392,6 +516,11 @@ void SceneLoader::load_shape(const pugi::xml_node &node, Scene &scene) {
     PSDR_ASSERT_MSG(bsdf_info != scene.m_param_map.end(), std::string("Unknown BSDF id: ") + bsdf_id);
     mesh->m_bsdf = dynamic_cast<const BSDF*>(&bsdf_info->second);
 
+    // set values for instances
+    for (int i = 0 ; i < layer_count ; i++){
+        layer_instances[i]->m_bsdf = mesh->m_bsdf;
+    }
+
     PSDR_ASSERT_MSG(!node.child("bsdf"), "BSDFs declared under shapes are not supported.");
 
     // Handle face normals
@@ -402,6 +531,12 @@ void SceneLoader::load_shape(const pugi::xml_node &node, Scene &scene) {
 
     if ( mesh_id ) mesh->m_id = mesh_id;
     mesh->m_use_face_normals = use_face_normals;
+
+    // set normal information for instances
+    for (int i = 0 ; i < layer_count ; i++){
+        layer_instances[i]->m_id = mesh->m_id + std::to_string(i);
+        layer_instances[i]->m_use_face_normals = use_face_normals;
+    }
 
     // Set emitter
     const pugi::xml_node &emitter_node = node.child("emitter");
@@ -415,7 +550,18 @@ void SceneLoader::load_shape(const pugi::xml_node &node, Scene &scene) {
     }
 
     mesh->m_to_world_raw = Matrix4fD(load_transform(node.child("transform")));
+
+    // add the layer instances to the scene
+    for (int i = 0 ; i < layer_count ; i++){
+        layer_instances[i]->m_to_world_raw = Matrix4fD(load_transform(node.child("transform")));
+    }
+
     scene.m_meshes.push_back(mesh);
+
+    // add the layer instances to the scene
+    for (int i = 0 ; i < layer_count ; i++){
+        scene.m_meshes.push_back(layer_instances[i]);
+    }
 }
 
 } // namespace psdr

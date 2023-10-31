@@ -36,6 +36,9 @@ public:
     virtual PrimaryEdgeSample sample_primary_edge(const FloatC &sample1) const = 0;
 
     ScalarVector2i          m_resolution;
+    ScalarVector2i          m_cropsize;
+    ScalarVector2i          m_cropoffset;
+    
     float                   m_aspect;
 
     Matrix4fD               m_to_world = identity<Matrix4fD>();

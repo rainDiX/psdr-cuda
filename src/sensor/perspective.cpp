@@ -11,7 +11,12 @@ namespace psdr
 void PerspectiveCamera::configure() {
     Sensor::configure();
 
+    ScalarVector2f relsize( (float)m_cropsize.x() / (float)m_resolution.x(), (float)m_cropsize.y() / (float)m_resolution.y());
+    ScalarVector2f reloffset( (float)m_cropoffset.x() / (float)m_resolution.x(), (float)m_cropoffset.y() / (float)m_resolution.y());
+
     ScalarMatrix4f camera_to_sample =
+        transform::scale(ScalarVector3f(1.0f / relsize.x(), 1.0 / relsize.y(), 1.f)) *
+        transform::translate(ScalarVector3f(-reloffset.x(), -reloffset.y(), 0.0f)) *
         transform::scale(ScalarVector3f(-0.5f, -0.5f * m_aspect, 1.f)) *
         transform::translate(ScalarVector3f(-1.f, -1.f / m_aspect, 0.f)) *
         transform::perspective(m_fov_x, m_near_clip, m_far_clip);
@@ -109,6 +114,12 @@ void PerspectiveCamera::configure() {
             m_enable_edges = false;
         }
     }
+
+    // std::cout<<"camera_to_sample"<<m_camera_to_sample<<std::endl;
+    // std::cout<<"sample_to_camera"<<m_sample_to_camera<<std::endl;
+    // std::cout<<"sample_to_world"<<m_sample_to_world<<std::endl;
+    // std::cout<<"world_to_sample"<<m_world_to_sample<<std::endl;
+    // std::cout<<"To world"<<m_to_world<<std::endl;
 }
 
 
@@ -140,10 +151,10 @@ SensorDirectSampleC PerspectiveCamera::sample_direct(const Vector3fC &p) const {
     SensorDirectSampleC result;
     result.q = head<2>(transform_pos<FloatC>(detach(m_world_to_sample), p));
 
-    Vector2iC iq = floor2int<Vector2iC, Vector2fC>(result.q*m_resolution);
-    result.is_valid = iq.x() >= 0 && iq.x() < m_resolution.x() &&
-                      iq.y() >= 0 && iq.y() < m_resolution.y();
-    result.pixel_idx = select(result.is_valid, iq.y()*m_resolution.x() + iq.x(), -1);
+    Vector2iC iq = floor2int<Vector2iC, Vector2fC>(result.q*m_cropsize);
+    result.is_valid = iq.x() >= 0 && iq.x() < m_cropsize.x() &&
+                      iq.y() >= 0 && iq.y() < m_cropsize.y();
+    result.pixel_idx = select(result.is_valid, iq.y()*m_cropsize.x() + iq.x(), -1);
 
     Vector3fC dir = p - detach(m_camera_pos);
     FloatC dist2 = squared_norm(dir);
@@ -179,12 +190,12 @@ PrimaryEdgeSample PerspectiveCamera::sample_primary_edge(const FloatC &_sample1)
     Vector2fC p     = detach(p_);
     result.x_dot_n  = dot(p_, edge_normal);
 
-    Vector2iC ip    = floor2int<Vector2iC, Vector2fC>(p*m_resolution);
-    MaskC valid     = ip.x() >= 0 && ip.x() < m_resolution.x() &&
-                      ip.y() >= 0 && ip.y() < m_resolution.y();
+    Vector2iC ip    = floor2int<Vector2iC, Vector2fC>(p*m_cropsize);
+    MaskC valid     = ip.x() >= 0 && ip.x() < m_cropsize.x() &&
+                      ip.y() >= 0 && ip.y() < m_cropsize.y();
 
     result.idx      = full<IntC>(-1, m);
-    masked(result.idx, valid) = ip.y()*m_resolution.x() + ip.x();
+    masked(result.idx, valid) = ip.y()*m_cropsize.x() + ip.x();
 
     result.ray_p    = sample_primary_ray(p + EdgeEpsilon*edge_normal);
     result.ray_n    = sample_primary_ray(p - EdgeEpsilon*edge_normal);

@@ -15,6 +15,7 @@ public:
     }
 
     void configure() override;
+    void setposition(Vector3fD p) override;
 
     inline void set_transform(const Matrix4fD &mat) {
         m_to_world_left = mat;

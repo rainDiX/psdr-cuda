@@ -45,11 +45,37 @@ struct Intersection_ : public Interaction_<Float_> {
     Vector2f<ad>        uv;
     Float<ad>           J;                  // Jacobian determinant for material-form reparam
 
+    // Xi Deng added
+    Float<ad>           num;                // number of intersection along the ray
+    // Int<ad>             pixelIdx;
     ENOKI_DERIVED_STRUCT(Intersection_, Interaction_<Float_>,
         ENOKI_BASE_FIELDS(wi, p, t),
-        ENOKI_DERIVED_FIELDS(shape, n, sh_frame, uv, J)
+        ENOKI_DERIVED_FIELDS(shape, n, sh_frame, uv, J, num)
     )
 };
+
+
+// template <typename Float_>
+// struct Intersections__ {
+//     static constexpr bool ad = std::is_same_v<Float_, FloatD>;
+
+//     template <typename Float1_>
+//     inline Intersections__(const Float<ad> num) : num(num) {}
+
+//     Array<MeshArray<ad>, 20>       shape;
+
+//     Array<Vector3f<ad>, 20>        n;                  // geometric normal
+//     Array<Frame<ad>, 20>           sh_frame;           // shading frame
+
+//     Array<Vector2f<ad>, 20>        uv;
+//     Array<Float<ad>, 20>           J;                  // Jacobian determinant for material-form reparam
+
+//     // Xi Deng added
+//     Array<Float<ad>< 20>           num;                // number of intersection along the ray
+
+//     Float<ad> num;
+//     ENOKI_STRUCT(Intersections__, its, num)
+// };
 
 
 //inline IntersectionC detach(const IntersectionD &its) {
@@ -68,4 +94,5 @@ struct Intersection_ : public Interaction_<Float_> {
 } // namespace psdr
 
 ENOKI_STRUCT_SUPPORT(psdr::Interaction_, wi, p, t)
-ENOKI_STRUCT_SUPPORT(psdr::Intersection_, wi, p, t, shape, n, sh_frame, uv, J)
+ENOKI_STRUCT_SUPPORT(psdr::Intersection_, wi, p, t, shape, n, sh_frame, uv, J, num)
+// ENOKI_STRUCT_SUPPORT(psdr::Intersections__, its, num)

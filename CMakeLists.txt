@@ -12,7 +12,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if( WIN32 )
     add_definitions(-D_USE_MATH_DEFINES -D_CRT_SECURE_NO_WARNINGS -DNDEBUG)
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -DNDEBUG -Wall")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g -Wall -DNDEBUG")
+    # -DNDEBUG
 endif()
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
@@ -25,6 +26,8 @@ if( WIN32 )
         message(FATAL_ERROR "PYTHON_ROOT not set!")
     endif()
 else()
+    set(ENOKI_DIR ${CMAKE_SOURCE_DIR}/ext/enoki)
+    set(PYBIND11_ROOT ${CMAKE_SOURCE_DIR}/ext/pybind11)
     if ( NOT ENOKI_DIR )
         message(FATAL_ERROR "ENOKI_DIR not set!")
     endif()
@@ -102,6 +105,7 @@ else()
         ${OpenEXR_INCLUDE_DIR}
         ${PYTHON_INCLUDE_PATH}
         ${ENOKI_DIR}/include
+        ${PYBIND11_ROOT}/include
     )
     link_directories(
         ${ENOKI_DIR}/build
@@ -141,6 +145,8 @@ set(PYPSDR_LIBRARIES enoki-cuda enoki-autodiff cuda)
 set(PSDR_INCLUDE_DIR include/psdr)
 set(PSDR_SOURCE_DIR src)
 
+
+
 set(PSDR_SOURCE_FILES
     ${PSDR_INCLUDE_DIR}/psdr.h
     ${PSDR_INCLUDE_DIR}/constants.h
@@ -166,6 +172,10 @@ set(PSDR_SOURCE_FILES
     ${PSDR_INCLUDE_DIR}/core/warp.h
     ${PSDR_INCLUDE_DIR}/core/transform.h
     ${PSDR_INCLUDE_DIR}/bsdf/bsdf.h
+    ${PSDR_INCLUDE_DIR}/bsdf/hetersub.h
+    ${PSDR_SOURCE_DIR}/bsdf/hetersub.cpp
+    ${PSDR_INCLUDE_DIR}/bsdf/microfacet.h
+    ${PSDR_SOURCE_DIR}/bsdf/microfacet.cpp
     ${PSDR_INCLUDE_DIR}/bsdf/diffuse.h
     ${PSDR_SOURCE_DIR}/bsdf/diffuse.cpp
     ${PSDR_INCLUDE_DIR}/bsdf/ggx.h
@@ -178,6 +188,8 @@ set(PSDR_SOURCE_FILES
     ${PSDR_SOURCE_DIR}/emitter/area.cpp
     ${PSDR_INCLUDE_DIR}/emitter/envmap.h
     ${PSDR_SOURCE_DIR}/emitter/envmap.cpp
+    ${PSDR_INCLUDE_DIR}/emitter/point.h
+    ${PSDR_SOURCE_DIR}/emitter/point.cpp
     ${PSDR_INCLUDE_DIR}/sensor/sensor.h
     ${PSDR_SOURCE_DIR}/sensor/sensor.cpp
     ${PSDR_INCLUDE_DIR}/sensor/perspective.h
@@ -199,6 +211,12 @@ set(PSDR_SOURCE_FILES
     ${PSDR_SOURCE_DIR}/integrator/field.cpp
     ${PSDR_INCLUDE_DIR}/integrator/direct.h
     ${PSDR_SOURCE_DIR}/integrator/direct.cpp
+    ${PSDR_INCLUDE_DIR}/integrator/laser.h
+    ${PSDR_SOURCE_DIR}/integrator/laser.cpp
+    ${PSDR_INCLUDE_DIR}/integrator/colocate.h
+    ${PSDR_SOURCE_DIR}/integrator/colocate.cpp
+    ${PSDR_INCLUDE_DIR}/integrator/direct_origin.h
+    ${PSDR_SOURCE_DIR}/integrator/direct_origin.cpp
     ${PSDR_SOURCE_DIR}/psdr.cpp
 )
 
@@ -212,11 +230,11 @@ else()
     target_link_libraries(psdr_cuda ${PYPSDR_LIBRARIES} ${CUDA_LIBRARIES} ${OpenEXR_LIBRARIES})
 endif()
 
-
-# target build
 target_compile_definitions(psdr_cuda PRIVATE PTX_OUTPUT_DIR="${CUDA_GENERATED_OUTPUT_DIR}")
 
+# target build
 set_target_properties(psdr_cuda PROPERTIES SKIP_BUILD_RPATH FALSE)
 set_target_properties(psdr_cuda PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
 set_property(TARGET psdr_cuda PROPERTY CXX_STANDARD 17)
 set_target_properties(psdr_cuda PROPERTIES PREFIX "")
+

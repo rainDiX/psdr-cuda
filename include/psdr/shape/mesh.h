@@ -12,7 +12,12 @@ public:
     Mesh() = default;
     ~Mesh() override;
 
+
     void load(const char *fname, bool verbose = false);
+    
+    // xi deng added for multilayer bssrdf
+    void instance(const Mesh *mesh, float offset=0.01f);
+    // xi deng added for multilayer bssrdf
     void configure();
     void prepare_optix_buffers();
 
@@ -37,6 +42,8 @@ public:
 #ifdef PSDR_MESH_ENABLE_1D_VERTEX_OFFSET
     void shift_vertices();
 #endif
+
+    // void offset_vertices(float depth);
 
     PositionSampleC sample_position(const Vector2fC &sample2, MaskC active = true) const;
     PositionSampleD sample_position(const Vector2fD &sample2, MaskD active = true) const;
@@ -90,7 +97,8 @@ public:
     Vectori<5, true>    m_edge_indices;
 
     float               m_total_area, m_inv_total_area;
-
+    int                 m_layer_count = -1; // -1 for no layers, 0 for layers' mesh, > 0 for the outmost surface
+    
     // For position sampling
     DiscreteDistribution *m_face_distrb = nullptr;
 

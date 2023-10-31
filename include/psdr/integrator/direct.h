@@ -15,8 +15,11 @@ public:
     bool m_hide_emitters = false;
 
 protected:
-    SpectrumC Li(const Scene &scene, Sampler &sampler, const RayC &ray, MaskC active = true) const override;
-    SpectrumD Li(const Scene &scene, Sampler &sampler, const RayD &ray, MaskD active = true) const override;
+    SpectrumC Li(const Scene &scene, Sampler &sampler, const RayC &ray, MaskC active = true, int sensor_id=0) const override;
+    SpectrumD Li(const Scene &scene, Sampler &sampler, const RayD &ray, MaskD active = true, int sensor_id=0) const override;
+
+    
+    IntC _compress(IntC input, MaskC mask) const;
 
     template <bool ad>
     Spectrum<ad> __Li(const Scene &scene, Sampler &sampler, const Ray<ad> &ray, Mask<ad> active) const;
@@ -25,6 +28,9 @@ protected:
 
     template <bool ad>
     std::pair<IntC, Spectrum<ad>> eval_secondary_edge(const Scene &scene, const Sensor &sensor, const Vector3fC &sample3) const;
+
+    template <bool ad>
+    void eval_secondary_edge_bssrdf(const Scene &scene, const IntersectionC &its, const Sensor &sensor, const Vector3fC &sample3, SpectrumD &result) const;
 
     int m_bsdf_samples, m_light_samples;
     std::vector<HyperCubeDistribution3f*> m_warpper;

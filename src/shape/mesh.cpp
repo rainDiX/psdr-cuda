@@ -20,29 +20,33 @@ template <bool ad>
 static std::pair<TriangleInfo<ad>, Vector3f<ad>> process_mesh(const Vector3f<ad> &vertex_positions, const Vector3i<ad> &face_indices) {
     const int num_vertices = static_cast<int>(slices(vertex_positions));
 
+    // std::cout<<"processing mesh"<<std::endl;
     TriangleInfo<ad> triangles;
     triangles.p0 = gather<Vector3f<ad>>(vertex_positions, face_indices[0]);
     triangles.e1 = gather<Vector3f<ad>>(vertex_positions, face_indices[1]) - triangles.p0;
     triangles.e2 = gather<Vector3f<ad>>(vertex_positions, face_indices[2]) - triangles.p0;
-
+    // std::cout<<"processing mesh 2"<<std::endl;
     Vector3f<ad> &face_normals = triangles.face_normal;
     Float<ad>    &face_areas = triangles.face_area;
 
     face_normals = cross(triangles.e1, triangles.e2);
     face_areas   = norm(face_normals);
-
+    // std::cout<<"processing mesh 3"<<num_vertices<<std::endl;
     Vector3f<ad> vertex_normals = zero<Vector3f<ad>>(num_vertices);
     Float<ad>    vertex_weights = zero<Float<ad>>(num_vertices);
     for ( int i = 0; i < 3; ++i ) {
         scatter_add(vertex_normals, face_normals, face_indices[i]);
         scatter_add(vertex_weights, face_areas  , face_indices[i]);
     }
+    // std::cout<<"processing mesh 4"<<std::endl;
     vertex_normals = normalize(vertex_normals/vertex_weights);
-
+    // std::cout<<"processing mesh 5"<<std::endl;
     triangles.n0 = gather<Vector3f<ad>>(vertex_normals, face_indices[0]);
+    // std::cout<<"processing mesh 6"<<std::endl;
     triangles.n1 = gather<Vector3f<ad>>(vertex_normals, face_indices[1]);
+    // std::cout<<"processing mesh 7"<<std::endl;
     triangles.n2 = gather<Vector3f<ad>>(vertex_normals, face_indices[2]);
-
+    // std::cout<<"processing mesh 5"<<std::endl;
     // Normalize the face normals
     face_normals /= face_areas;
     face_areas *= 0.5f;
@@ -56,6 +60,47 @@ Mesh::~Mesh() {
     if ( m_triangle_info ) delete m_triangle_info;
     if ( m_triangle_uv ) delete m_triangle_uv;
     if ( m_sec_edge_info ) delete m_sec_edge_info;
+}
+
+void Mesh::instance(const Mesh * origin_mesh, float offset){
+    m_num_vertices = origin_mesh->m_num_vertices;
+
+    // copying vertex positions
+    {
+        m_vertex_positions_raw = Vector3fD(origin_mesh->m_vertex_positions_raw);
+    }
+
+#ifdef PSDR_MESH_ENABLE_1D_VERTEX_OFFSET
+    m_vertex_offset = zero<FloatD>(m_num_vertices) + offset;
+#endif
+
+    // Loading vertex uv coordinates
+    m_has_uv = origin_mesh->m_has_uv;
+    std::cout<<"has uv ? "<<m_has_uv<<std::endl;
+    if(m_has_uv) {
+        m_vertex_uv = Vector2fD(origin_mesh->m_vertex_uv);
+    }
+
+    // Loading mesh faces
+    m_num_faces = origin_mesh->m_num_faces;
+
+    m_face_indices = Vector3iD(origin_mesh->m_face_indices);
+    if (m_has_uv) {
+        m_face_uv_indices = Vector3iD(origin_mesh->m_face_uv_indices);
+    }
+
+    m_enable_edges = origin_mesh->m_enable_edges;
+    if(m_enable_edges)
+        m_edge_indices = Vectori<5, true>(origin_mesh->m_edge_indices);
+
+    // // 
+    // if ( verbose ) {
+    //     std::cout << "Loaded " << m_num_vertices << " vertices, "
+    //                            << m_num_faces    << " faces, "
+    //                            << m_num_edges    << " edges. " << std::endl;
+    // }
+
+    m_ready = false;
 }
 
 
@@ -80,9 +125,11 @@ void Mesh::load(const char *fname, bool verbose) {
         buffers[1].resize(m_num_vertices);
         buffers[2].resize(m_num_vertices);
 
-        for ( int i = 0; i < m_num_vertices; ++i )
-            for ( int j = 0; j < 3; ++j )
+        for ( int i = 0; i < m_num_vertices; ++i ){
+            for ( int j = 0; j < 3; ++j ){
                 buffers[j][i] = attrib.vertices[3*i + j];
+            }
+        }
 
         m_vertex_positions_raw = Vector3fD(FloatD::copy(buffers[0].data(), m_num_vertices),
                                            FloatD::copy(buffers[1].data(), m_num_vertices),
@@ -219,14 +266,16 @@ void Mesh::configure() {
 
     // Calculating the "raw" (i.e., object-space) vertex normals
     std::tie(std::ignore, m_vertex_normals_raw) = process_mesh<true>(m_vertex_positions_raw, m_face_indices);
+    // std::cout<<"new mesh: "<<slices(m_vertex_positions_raw)<<std::endl;
+    // std::cout<<"new mesh: "<<slices(m_face_indices)<<std::endl;
 
     Matrix4fD to_world = m_to_world_left * m_to_world_raw * m_to_world_right;
 
     // Calculating the world-space vertex positions
 #ifdef PSDR_MESH_ENABLE_1D_VERTEX_OFFSET
     m_vertex_positions = transform_pos(
-        to_world, fmadd(m_vertex_normals_raw, m_vertex_offset, m_vertex_positions_raw)
-    );
+        to_world, fnmadd(m_vertex_normals_raw, m_vertex_offset, m_vertex_positions_raw)
+    ); // xi deng changed from fmadd to fnmadd to fit for shell texture
 #else
     m_vertex_positions = transform_pos(to_world, m_vertex_positions_raw);
 #endif
@@ -269,7 +318,6 @@ void Mesh::configure() {
     }
 
     m_ready = true;
-
     prepare_optix_buffers();
 }
 
@@ -277,7 +325,7 @@ void Mesh::configure() {
 void Mesh::prepare_optix_buffers() {
     PSDR_ASSERT(m_ready);
     IntC idx;
-
+    
     m_vertex_buffer = empty<FloatC>(m_num_vertices*3);
     idx = arange<IntC>(m_num_vertices)*3;
     for ( int i = 0; i < 3; ++i ) {
@@ -344,18 +392,23 @@ FloatD Mesh::sample_position_pdf(const IntersectionD &its, MaskD active) const {
 
 #ifdef PSDR_MESH_ENABLE_1D_VERTEX_OFFSET
 void Mesh::shift_vertices() {
-    m_vertex_positions_raw += detach(m_vertex_normals_raw)*detach(m_vertex_offset);
+    // Xi deng changed this from multilayer 
+    m_vertex_positions_raw -= m_vertex_normals_raw * m_vertex_offset;
+    // m_vertex_positions_raw += detach(m_vertex_normals_raw)*detach(m_vertex_offset);
     m_vertex_offset = zero<FloatD>(m_num_vertices);
     m_ready = false;
 }
 #endif
 
 
+// 
+
 void Mesh::dump(const char *fname) const {
     std::array<std::vector<float>, 3> vertex_positions, vertex_normals;
     {
 #ifdef PSDR_MESH_ENABLE_1D_VERTEX_OFFSET
-        Vector3fC vertex_positions_ = fmadd(detach(m_vertex_normals_raw), detach(m_vertex_offset), detach(m_vertex_positions_raw));
+        Vector3fC vertex_positions_ = fnmadd(detach(m_vertex_normals_raw), detach(m_vertex_offset), detach(m_vertex_positions_raw));
+        // Vector3fC vertex_positions_ = fmadd(detach(m_vertex_normals_raw), detach(m_vertex_offset), detach(m_vertex_positions_raw));
 #else
         const Vector3fC &vertex_positions_ = detach(m_vertex_positions_raw);
 #endif
